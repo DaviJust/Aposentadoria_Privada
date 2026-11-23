@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Dict
 
 PARAMETROS_PERFIL: Dict[str, Dict[str, float]] = {
     'conservador': {'retorno': 0.04, 'volatilidade': 0.03},
@@ -10,6 +11,7 @@ TETO_ISENCAO_SIMPLIFICADA_ANUAL: float = 85000.0
 @dataclass
 class PerfilInvestidor:
     renda_bruta_mensal: float
+    aporte_mensal: float               # <-- Adicione este campo aqui
     gasto_mensal_aposentadoria: float  
     margem_gasto_percentual: float     
     patrimonio_atual: float

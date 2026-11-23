@@ -6,21 +6,27 @@ const formatarMoeda = (valor: number) =>
   valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export function App() {
-  const [form, setForm] = useState<SimulacaoRequest>({
-    renda_bruta_mensal: 5000,
-    gasto_mensal_aposentadoria: 2500,
-    margem_gasto_percentual: 0.15,
-    aporte_mensal: 1500,
-    patrimonio_atual: 30000,
-    meta_patrimonio: 600000,
-    declara_ir_completo: true,
-    anos_ate_aposentadoria: 20,
-  });
+  const [rendaBrutaMensal, setRendaBrutaMensal] = useState<number>(5000);
+  const [gastoMensalAtual, setGastoMensalAtual] = useState<number>(3000);
+  const [gastoAposentadoria, setGastoAposentadoria] = useState<number>(2500);
+  const [ganhoEsperado, setGanhoEsperado] = useState<number>(300);
+  const [anosInvestimento, setAnosInvestimento] = useState<number>(20);
+  const [aporteMensal, setAporteMensal] = useState<number>(1500);
 
   const [resultado, setResultado] = useState<SimulacaoResponse | null>(null);
   const [historico, setHistorico] = useState<HistoricoItem[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  // Calcula a porcentagem do ganho esperado em relação à renda bruta
+  const porcentagemGanho = rendaBrutaMensal > 0 ? ganhoEsperado / rendaBrutaMensal : 0;
+
+  // Calcula a variação percentual entre o gasto atual e o gasto na aposentadoria (limitada entre 0 e 1 para a API)
+  const variacaoGasto =
+    gastoMensalAtual > 0
+      ? Math.abs(gastoMensalAtual - gastoAposentadoria) / gastoMensalAtual
+      : porcentagemGanho;
+  const margemPercentual = Math.min(1, Math.max(0, Number(variacaoGasto.toFixed(4))));
 
   const carregarHistorico = async () => {
     try {
@@ -40,8 +46,22 @@ export function App() {
     setCarregando(true);
     setErro(null);
 
+    // Meta patrimonial baseada no maior valor entre o gasto na aposentadoria e o ganho esperado (regra dos 4%)
+    const rendaAlvoMensal = Math.max(gastoAposentadoria, ganhoEsperado);
+
+    const payload: SimulacaoRequest = {
+      renda_bruta_mensal: rendaBrutaMensal,
+      gasto_mensal_aposentadoria: gastoAposentadoria,
+      margem_gasto_percentual: margemPercentual,
+      aporte_mensal: aporteMensal,
+      patrimonio_atual: 0,
+      meta_patrimonio: Math.max(1000, (rendaAlvoMensal * 12) / 0.04),
+      declara_ir_completo: rendaBrutaMensal * 13 > 85000,
+      anos_ate_aposentadoria: anosInvestimento,
+    };
+
     try {
-      const res = await executarSimulacao(form);
+      const res = await executarSimulacao(payload);
       setResultado(res);
       await carregarHistorico();
     } catch (err: unknown) {
@@ -60,85 +80,78 @@ export function App() {
         onSubmit={handleSubmit}
         style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "2rem" }}
       >
-        <label>
-          Renda Bruta Mensal (R$)
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          Renda bruta mensal (R$)
           <input
             type="number"
-            value={form.renda_bruta_mensal}
-            onChange={(e) => setForm({ ...form, renda_bruta_mensal: Number(e.target.value) })}
-            required
-          />
-        </label>
-
-        <label>
-          Gasto Mensal na Aposentadoria (R$)
-          <input
-            type="number"
-            value={form.gasto_mensal_aposentadoria}
-            onChange={(e) => setForm({ ...form, gasto_mensal_aposentadoria: Number(e.target.value) })}
-            required
-          />
-        </label>
-
-        <label>
-          Margem de lucro(0 a 1, ex: 0.15)
-          <input
-            type="number"
-            step="0.01"
             min="0"
-            max="1"
-            value={form.margem_gasto_percentual}
-            onChange={(e) => setForm({ ...form, margem_gasto_percentual: Number(e.target.value) })}
+            step="0.01"
+            value={rendaBrutaMensal}
+            onChange={(e) => setRendaBrutaMensal(Number(e.target.value))}
             required
           />
         </label>
 
-        <label>
-          Aporte Mensal (R$)
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          Gasto mensal atual (R$)
           <input
             type="number"
-            value={form.aporte_mensal}
-            onChange={(e) => setForm({ ...form, aporte_mensal: Number(e.target.value) })}
+            min="0"
+            step="0.01"
+            value={gastoMensalAtual}
+            onChange={(e) => setGastoMensalAtual(Number(e.target.value))}
             required
           />
         </label>
 
-        <label>
-          Patrimônio Atual (R$)
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          Quanto espera gastar quando se aposentar (R$/mês)
           <input
             type="number"
-            value={form.patrimonio_atual}
-            onChange={(e) => setForm({ ...form, patrimonio_atual: Number(e.target.value) })}
-          />
-        </label>
-
-        <label>
-          Meta de Patrimônio (R$)
-          <input
-            type="number"
-            value={form.meta_patrimonio}
-            onChange={(e) => setForm({ ...form, meta_patrimonio: Number(e.target.value) })}
+            min="1"
+            step="0.01"
+            value={gastoAposentadoria}
+            onChange={(e) => setGastoAposentadoria(Number(e.target.value))}
             required
           />
         </label>
 
-        <label>
-          Anos até Aposentadoria
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          Quanto você espera ganhar (R$/mês)
           <input
             type="number"
-            value={form.anos_ate_aposentadoria}
-            onChange={(e) => setForm({ ...form, anos_ate_aposentadoria: Number(e.target.value) })}
+            min="1"
+            step="0.01"
+            value={ganhoEsperado}
+            onChange={(e) => setGanhoEsperado(Number(e.target.value))}
+            required
+          />
+          <small style={{ color: "#555" }}>
+            Equivale a {(porcentagemGanho * 100).toFixed(2)}% da renda bruta
+          </small>
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          Quantos anos você pretende investir
+          <input
+            type="number"
+            min="1"
+            value={anosInvestimento}
+            onChange={(e) => setAnosInvestimento(Number(e.target.value))}
             required
           />
         </label>
 
-        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          Quanto você pretende investir (R$/mês)
           <input
-            type="checkbox"
-            checked={form.declara_ir_completo}
-            onChange={(e) => setForm({ ...form, declara_ir_completo: e.target.checked })}
+            type="number"
+            min="0"
+            step="0.01"
+            value={aporteMensal}
+            onChange={(e) => setAporteMensal(Number(e.target.value))}
+            required
           />
-          Faz declaração completa do IR?
         </label>
 
         <button type="submit" disabled={carregando} style={{ gridColumn: "span 2", padding: "0.75rem" }}>

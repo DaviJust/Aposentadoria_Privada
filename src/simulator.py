@@ -1,8 +1,11 @@
 import numpy as np
-from dataclasses import dataclass
 from typing import Dict, Any, Tuple
 
-# Constantes de configuração no escopo do módulo
+from src.domain import (
+    PARAMETROS_PERFIL,
+    TETO_ISENCAO_SIMPLIFICADA_ANUAL,
+    PerfilInvestidor,
+)
 
 
 def simular_cenarios_pca(
@@ -67,15 +70,17 @@ def simular_cenarios_pca(
     taxa_retirada_mediana = np.median(todas_as_taxas)
 
     return {
-        "probabilidade_sucesso": round(probabilidade_sucesso, 2),
-        "patrimonio_mediano_p50": round(np.median(patrimonios_finais), 2),
+        "probabilidade_sucesso": round(float(probabilidade_sucesso), 2),
+        "patrimonio_p10": round(float(np.percentile(patrimonios_finais, 10)), 2),
+        "patrimonio_mediano_p50": round(float(np.median(patrimonios_finais)), 2),
+        "patrimonio_p90": round(float(np.percentile(patrimonios_finais, 90)), 2),
         "margem_gasto_analisada": f"±{int(margem * 100)}%",
-        "gasto_mensal_minimo": round((gasto_alvo_anual * (1 - margem)) / 12, 2),
-        "gasto_mensal_maximo": round((gasto_alvo_anual * (1 + margem)) / 12, 2),
-        "taxa_retirada_media_combinada": round(taxa_retirada_media_combinada, 2),
-        "taxa_retirada_mediana": round(taxa_retirada_mediana, 2),
-        "desvio_padrao_taxa": round(desvio_padrao_taxa, 2),
-        "sustentavel": taxa_retirada_media_combinada <= (retorno_base * 100)
+        "gasto_mensal_minimo": round(float((gasto_alvo_anual * (1 - margem)) / 12), 2),
+        "gasto_mensal_maximo": round(float((gasto_alvo_anual * (1 + margem)) / 12), 2),
+        "taxa_retirada_media_combinada": round(float(taxa_retirada_media_combinada), 2),
+        "taxa_retirada_mediana": round(float(taxa_retirada_mediana), 2),
+        "desvio_padrao_taxa": round(float(desvio_padrao_taxa), 2),
+        "sustentavel": bool(taxa_retirada_media_combinada <= (retorno_base * 100))
     }
 
 
@@ -115,9 +120,9 @@ def recomendar_aposentadoria(perfil: PerfilInvestidor) -> Dict[str, Any]:
     plano_recomendado, tributacao_nota = _definir_estrategia_tributaria(perfil, renda_anual)
 
     return {
-        "renda_anual": renda_anual,
+        "renda_anual": float(renda_anual),
         "perfil_calculado": tolerancia,
         "plano_recomendado": plano_recomendado,
         "tributacao_nota": tributacao_nota,
-        "simulacao_pca": simulacao
+        "simulacao": simulacao
     }

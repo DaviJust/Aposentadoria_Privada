@@ -1,6 +1,7 @@
 import type { HistoricoItem, SimulacaoRequest, SimulacaoResponse } from "../types/simulacao";
 
-const API_URL = "http://localhost:8000";
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 
 export async function executarSimulacao(dados: SimulacaoRequest): Promise<SimulacaoResponse> {
     const response = await fetch(`${API_URL}/simular`, {

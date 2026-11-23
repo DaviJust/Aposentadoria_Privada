@@ -3,7 +3,6 @@ from typing import Dict, Any, Tuple
 
 from src.domain import (
     PARAMETROS_PERFIL,
-    TETO_ISENCAO_SIMPLIFICADA_ANUAL,
     PerfilInvestidor,
 )
 
@@ -44,6 +43,18 @@ def simular_cenarios_pca(
     patrimonios_finais = np.array(patrimonios_finais)
     probabilidade_sucesso = (sucessos / n_simulacoes) * 100
 
+    p10 = float(np.percentile(patrimonios_finais, 10))
+    p50 = float(np.median(patrimonios_finais))
+    p90 = float(np.percentile(patrimonios_finais, 90))
+
+    # Classifica em qual percentil (P10, P50 ou P90) a meta é atingida
+    if p10 >= perfil.meta_patrimonio:
+        cenario_atingido = "P10"
+    elif p50 >= perfil.meta_patrimonio:
+        cenario_atingido = "P50"
+    else:
+        cenario_atingido = "P90"
+
     # 2. Análise Combinatória de Gastos (Margem Flexível)
     gasto_alvo_anual = perfil.gasto_mensal_aposentadoria * 12
     margem = perfil.margem_gasto_percentual
@@ -71,9 +82,10 @@ def simular_cenarios_pca(
 
     return {
         "probabilidade_sucesso": round(float(probabilidade_sucesso), 2),
-        "patrimonio_p10": round(float(np.percentile(patrimonios_finais, 10)), 2),
-        "patrimonio_mediano_p50": round(float(np.median(patrimonios_finais)), 2),
-        "patrimonio_p90": round(float(np.percentile(patrimonios_finais, 90)), 2),
+        "cenario_atingido": cenario_atingido,
+        "patrimonio_p10": round(p10, 2),
+        "patrimonio_mediano_p50": round(p50, 2),
+        "patrimonio_p90": round(p90, 2),
         "margem_gasto_analisada": f"±{int(margem * 100)}%",
         "gasto_mensal_minimo": round(float((gasto_alvo_anual * (1 - margem)) / 12), 2),
         "gasto_mensal_maximo": round(float((gasto_alvo_anual * (1 + margem)) / 12), 2),
@@ -88,18 +100,18 @@ def _definir_estrategia_tributaria(perfil: PerfilInvestidor, renda_anual: float)
     """Define a modalidade (PGBL/VGBL), o regime (Regressiva/Progressiva) e a recomendação fiscal."""
     tabela_ir = "Regressiva" if perfil.anos_ate_aposentadoria >= 10 else "Progressiva"
 
-    if perfil.declara_ir_completo and renda_anual > TETO_ISENCAO_SIMPLIFICADA_ANUAL:
+    if perfil.renda_bruta_mensal < 6000.0 or not perfil.declara_ir_completo:
+        plano = f"VGBL ({tabela_ir})"
+        nota = (
+            "Opte por VGBL: quando a renda mensal é menor que R$ 6.000,00 ou não há necessidade de "
+            "declaração completa do IR, o VGBL é a melhor opção pois o imposto incide apenas sobre os rendimentos no resgate."
+        )
+    else:
         limite_pgbl_mensal = (renda_anual * 0.12) / 13
         plano = f"PGBL ({tabela_ir})"
         nota = (
-            f"Como a renda anual supera a faixa de isenção/desconto simplificado e a declaração é completa, "
+            f"Como a renda mensal é igual ou superior a R$ 6.000,00 e há declaração completa do IR, "
             f"invista até R$ {limite_pgbl_mensal:.2f}/mês no PGBL para dedução de até 12% no IRPF."
-        )
-    else:
-        plano = f"VGBL ({tabela_ir})"
-        nota = (
-            "Opte por VGBL: para rendas menores, isentas ou declaração simplificada, o diferimento do PGBL "
-            "não compensa e o VGBL garante imposto apenas sobre os rendimentos no resgate."
         )
 
     return plano, nota
@@ -122,6 +134,7 @@ def recomendar_aposentadoria(perfil: PerfilInvestidor) -> Dict[str, Any]:
     return {
         "renda_anual": float(renda_anual),
         "perfil_calculado": tolerancia,
+        "cenario_atingido": simulacao["cenario_atingido"],
         "plano_recomendado": plano_recomendado,
         "tributacao_nota": tributacao_nota,
         "simulacao": simulacao

@@ -12,6 +12,7 @@ export function App() {
   const [ganhoEsperado, setGanhoEsperado] = useState<number>(300);
   const [anosInvestimento, setAnosInvestimento] = useState<number>(20);
   const [aporteMensal, setAporteMensal] = useState<number>(1500);
+  const [ehFuncionarioPublico, setEhFuncionarioPublico] = useState<boolean>(false);
 
   const [resultado, setResultado] = useState<SimulacaoResponse | null>(null);
   const [historico, setHistorico] = useState<HistoricoItem[]>([]);
@@ -49,6 +50,9 @@ export function App() {
     // Meta patrimonial baseada no maior valor entre o gasto na aposentadoria e o ganho esperado (regra dos 4%)
     const rendaAlvoMensal = Math.max(gastoAposentadoria, ganhoEsperado);
 
+    // Só ativa o caminho do PGBL no backend se for funcionário público e ganhar mais de R$ 6.000
+    const elegivelPgbl = ehFuncionarioPublico && rendaBrutaMensal > 6000;
+
     const payload: SimulacaoRequest = {
       renda_bruta_mensal: rendaBrutaMensal,
       gasto_mensal_aposentadoria: gastoAposentadoria,
@@ -56,12 +60,25 @@ export function App() {
       aporte_mensal: aporteMensal,
       patrimonio_atual: 0,
       meta_patrimonio: Math.max(1000, (rendaAlvoMensal * 12) / 0.04),
-      declara_ir_completo: rendaBrutaMensal * 13 > 85000,
+      declara_ir_completo: elegivelPgbl,
       anos_ate_aposentadoria: anosInvestimento,
     };
 
     try {
       const res = await executarSimulacao(payload);
+
+      // Garante a regra exata na exibição caso ganhe > 6000 e não seja funcionário público (ou seja e ganhe entre 6000 e 6538)
+      const regimeIr = anosInvestimento >= 10 ? "Regressiva" : "Progressiva";
+      if (!ehFuncionarioPublico && rendaBrutaMensal > 6000) {
+        res.plano_recomendado = `VGBL (${regimeIr})`;
+        res.tributacao_nota =
+          "Opte por VGBL: como a renda supera R$ 6.000,00 e você não é funcionário público, o VGBL garante imposto apenas sobre os rendimentos no resgate.";
+      } else if (ehFuncionarioPublico && rendaBrutaMensal > 6000) {
+        const limitePgblMensal = (rendaBrutaMensal * 13 * 0.12) / 13;
+        res.plano_recomendado = `PGBL (${regimeIr})`;
+        res.tributacao_nota = `Como você é funcionário público e possui renda acima de R$ 6.000,00, invista até ${formatarMoeda(limitePgblMensal)}/mês no PGBL para dedução de até 12% no IRPF.`;
+      }
+
       setResultado(res);
       await carregarHistorico();
     } catch (err: unknown) {
@@ -152,6 +169,15 @@ export function App() {
             onChange={(e) => setAporteMensal(Number(e.target.value))}
             required
           />
+        </label>
+
+        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", gridColumn: "span 2" }}>
+          <input
+            type="checkbox"
+            checked={ehFuncionarioPublico}
+            onChange={(e) => setEhFuncionarioPublico(e.target.checked)}
+          />
+          Declara Imposto?
         </label>
 
         <button type="submit" disabled={carregando} style={{ gridColumn: "span 2", padding: "0.75rem" }}>
